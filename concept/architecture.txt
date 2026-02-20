@@ -1,0 +1,38 @@
+node2084/
+  main.py
+
+  core/
+    game.py              # main loop, pygame init, global singletons
+    state_machine.py     # StateMachine + BaseState
+    events.py            # optional: small event constants/helpers
+
+  states/
+    boot.py              # BootState
+    terminal.py          # TerminalState (truth + later terminal interrupts)
+    play.py              # PlayState (contains cycle manager + world update)
+
+  world/
+    map.py               # Map layout + wall sets per cycle
+    player.py            # Player entity
+    sensors.py           # Sensor + SensorManager
+    tasks.py             # Task base + TaskSystem + specific tasks
+    discoveries.py       # Discovery base + DiscoverySystem + specific discoveries
+    collision.py         # collision helpers (resolve_rect, etc)
+
+  ui/
+    message_banner.py    # MessageSystem (ack banners, system notices)
+    text.py              # text rendering helpers, layout positions
+    terminal_renderer.py # optional: terminal text renderer if it grows
+
+  fx/
+    phosphor.py          # PhosphorPulse
+    crt.py               # scanlines, jitter, flicker (later)
+    noise.py             # optional, if you add noise textures
+
+  config/
+    settings.py          # TimingConfig, GamePlayConfig
+    palette.py           # Colour + phosphor_colour (keep palette separate)
+
+  util/
+    timers.py            # small Timer / Cooldown helpers
+    math.py              # clamp, lerp, etc
