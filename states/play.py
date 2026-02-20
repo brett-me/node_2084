@@ -1,4 +1,3 @@
-
 import pygame
 
 from world.map import Map

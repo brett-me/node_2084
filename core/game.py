@@ -12,7 +12,7 @@ class Game:
     def __init__(self):
         pygame.init()
 
-        self.screen = pygame.display.set_mode((GridConfig.SCREEN_W, GridConfig.SCREEN_H ))
+        self.screen = pygame.display.set_mode((GridConfig.SCREEN_W, GridConfig.SCREEN_H))
         pygame.display.set_caption("NODE 2084")
 
         self.clock = pygame.time.Clock()

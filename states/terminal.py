@@ -107,7 +107,7 @@ class TerminalState:
             return
 
         if self.finishing and self.visible >= len(self.lines):
-            
+
             if self.post_attach_timer is None:
                 self.post_attach_timer = TimingConfig.POST_ATTACH_PAUSE
 
@@ -119,7 +119,10 @@ class TerminalState:
 
                 if self.machine:
                     from states.play import PlayState
-                    self.machine.change_state(PlayState(self.font, starting_suspicion=self.suspicion_delta))
+
+                    self.machine.change_state(
+                        PlayState(self.font, starting_suspicion=self.suspicion_delta)
+                    )
 
     def render(self, screen, x=40, y=60, line_h=28, colour=(0, 255, 70)):
         if not self.active:

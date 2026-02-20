@@ -28,5 +28,3 @@ class StateMachine:
 
     def render(self, screen):
         self.state.render(screen)
-
-
