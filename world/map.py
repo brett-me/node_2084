@@ -1,74 +1,73 @@
-# world/map.py
-
 import pygame
-
 from config.palette import Colour
-from world.sensors import Sensor
+from config.grid import GridConfig
 
 
 class Map:
-    """
-    Owns on-screen geometry (walls) and exposes spawn points + sensor placement.
+    """Loads a tile map from CSV and exposes walls + spawn point."""
 
-    Notes:
-    - The map is the whole screen (no scrolling).
-    - Layouts can mutate later via cycle/phase logic.
-    """
+    def __init__(self, csv_path):
+        self.csv_path = csv_path
 
-    def __init__(self, layout_id="corridor_v1", offset_y=100):
-        self.layout_id = layout_id
-        self.offset_y = offset_y
+        self.cols = GridConfig.COLS
+        self.rows = GridConfig.ROWS
+        self.cell = GridConfig.CELL
 
+        self.offset_x, self.offset_y = GridConfig.offset()
+
+        self.grid = []          # 2D list of tokens
+        self.walls = []         # list[pygame.Rect]
+        self.spawn_cell = None  # (col, row)
+
+        self._load_csv()
+        self._build_walls()
+
+    def _load_csv(self):
+        with open(self.csv_path, "r", encoding="utf-8") as f:
+            lines = [ln.strip() for ln in f.readlines() if ln.strip()]
+
+        if len(lines) != self.rows:
+            raise ValueError(f"Map row count mismatch: expected {self.rows}, got {len(lines)}")
+
+        grid = []
+        for r, line in enumerate(lines):
+            row = [c.strip() for c in line.split(",")]
+            if len(row) != self.cols:
+                raise ValueError(
+                    f"Map col count mismatch on row {r}: expected {self.cols}, got {len(row)}"
+                )
+            grid.append(row)
+
+            for c, token in enumerate(row):
+                if token == "S":
+                    self.spawn_cell = (c, r)
+
+        if self.spawn_cell is None:
+            raise ValueError("Map missing spawn cell 'S'")
+
+        self.grid = grid
+
+    def _cell_rect(self, c, r):
+        x = self.offset_x + c * self.cell
+        y = self.offset_y + r * self.cell
+        return pygame.Rect(x, y, self.cell, self.cell)
+
+    def _build_walls(self):
         self.walls = []
-        self._spawn_point = (0, 0)
-        self._sensor_specs = []
-
-        self._build_layout()
-
-    def _build_layout(self):
-        oy = self.offset_y
-
-        # Corridor v1: three rects (top/bottom rails + left block).
-        # These numbers are your current prototype layout.
-        left_x = 100
-        top_y = 200 + oy
-        width = 600
-        rail_h = 20
-        gap_h = 100
-
-        self.walls = [
-            pygame.Rect(left_x, top_y, width, rail_h),                     # top rail
-            pygame.Rect(left_x, top_y + gap_h, width, rail_h),             # bottom rail
-            pygame.Rect(left_x, top_y, rail_h, gap_h),                     # left block
-        ]
-
-        # Spawn point: inside corridor, slightly right of the left block, vertically centred.
-        self._spawn_point = (140, top_y + (gap_h // 2))
-
-        # Sensor specs: list of dicts so multiple sensors can exist later.
-        # For now: one sensor, matching your current prototype.
-        self._sensor_specs = [
-            {"origin": (114, 360), "length": 584, "spread": 72},
-        ]
+        for r in range(self.rows):
+            for c in range(self.cols):
+                if self.grid[r][c] == "#":
+                    self.walls.append(self._cell_rect(c, r))
 
     def get_walls(self):
         return self.walls
 
     def get_spawn_point(self):
-        return self._spawn_point
-
-    def create_sensors(self):
-        """Instantiate sensors for the current layout."""
-        sensors = []
-        for spec in self._sensor_specs:
-            sensors.append(
-                Sensor(
-                    origin=spec["origin"],
-                    length=spec.get("length", 140),
-                    spread=spec.get("spread", 80),
-                )
-            )
-        return sensors
+        c, r = self.spawn_cell
+        rect = self._cell_rect(c, r)
+        # Player is 20x20 currently; your cell is 16.
+        # For now: spawn at cell top-left, just like you asked (no extra behaviour changes).
+        return rect.x, rect.y
 
     def render(self, screen, phosphor_alpha):
         col = Colour.phosphor_colour(Colour.BRIGHT_GREEN, phosphor_alpha)

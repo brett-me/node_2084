@@ -3,6 +3,7 @@ import pygame
 from core.state_machine import StateMachine
 from states.boot import BootState
 from fx.phosphor import PhosphorPulse
+from config.grid import GridConfig
 
 
 class Game:
@@ -11,9 +12,7 @@ class Game:
     def __init__(self):
         pygame.init()
 
-        self.width = 800
-        self.height = 600
-        self.screen = pygame.display.set_mode((self.width, self.height))
+        self.screen = pygame.display.set_mode((GridConfig.SCREEN_W, GridConfig.SCREEN_H ))
         pygame.display.set_caption("NODE 2084")
 
         self.clock = pygame.time.Clock()

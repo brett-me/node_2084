@@ -1,6 +1,4 @@
 
-# states/play.py
-
 import pygame
 
 from world.map import Map
@@ -9,6 +7,8 @@ from world.player import Player
 from ui.message_banner import MessageSystem
 from config.settings import TimingConfig
 from config.palette import Colour
+from config.grid import GridConfig
+from utils.paths import asset_path
 
 
 class PlayState:
@@ -20,16 +20,17 @@ class PlayState:
         self.font = font
 
         self.timer = 0.0
-        self.player = None
 
-        self.map = Map(offset_y=100)
+        self.map = Map(asset_path("maps", "map_2048.csv"))
         self.walls = self.map.get_walls()
+        self.player = None
 
         self.suspicion = Suspicion()
         self.suspicion.value = starting_suspicion
         self.show_suspicion = False
 
-        self.sensors = self.map.create_sensors() or []
+        # for now: focus on permanent walls rendering; sensors come next step
+        self.sensors = []
         self.sensor_active = False
 
         self.has_moved = False
@@ -72,14 +73,19 @@ class PlayState:
         self.msg_banner.update(dt)
 
     def draw_grid(self, screen):
-        spacing = 40
-        width, height = screen.get_size()
+        spacing = GridConfig.CELL
 
-        for x in range(0, width, spacing):
-            pygame.draw.line(screen, Colour.DIM_GREEN, start_pos=(x, 0), end_pos=(x, height))
+        ox, oy = self.map.offset_x, self.map.offset_y
+        grid_w = GridConfig.COLS * spacing
+        grid_h = GridConfig.ROWS * spacing
 
-        for y in range(0, height, spacing):
-            pygame.draw.line(screen, Colour.DIM_GREEN, start_pos=(0, y), end_pos=(width, y))
+        for i in range(GridConfig.COLS + 1):
+            x = ox + i * spacing
+            pygame.draw.line(screen, Colour.DIM_GREEN, (x, oy), (x, oy + grid_h))
+
+        for j in range(GridConfig.ROWS + 1):
+            y = oy + j * spacing
+            pygame.draw.line(screen, Colour.DIM_GREEN, (ox, y), (ox + grid_w, y))
 
     def draw_suspicion_meter(self, screen):
         value = int(self.suspicion.value)
@@ -99,12 +105,13 @@ class PlayState:
         alpha = int(self.game.phosphor.alpha) if self.game else 255
         self.map.render(screen, alpha)
 
-        for sensor in self.sensors:
-            sensor.render(screen, draw_cone=False)
-
-        if self.sensor_active:
+        if self.sensors:
             for sensor in self.sensors:
-                sensor.render(screen)
+                sensor.render(screen, draw_cone=False)
+
+            if self.sensor_active:
+                for sensor in self.sensors:
+                    sensor.render(screen)
 
         if self.player:
             self.player.render(screen)

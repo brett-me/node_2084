@@ -7,9 +7,9 @@ class Player:
     """the node: glowing square, grid movement, collision"""
 
     def __init__(self, x, y):
-        self.rect = pygame.Rect(x, y, 20, 20)
+        self.rect = pygame.Rect(x, y, 16, 16)
 
-        self.speed = 160  # pixels per second
+        self.speed = 165  # pixels per second
         self.alpha = 0  # start invisible
 
     def fade(self, dt):
