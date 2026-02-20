@@ -22,6 +22,8 @@ class BootState:
 
     def __init__(self, font):
         self.font = font
+        self.machine = None
+        self.game = None
         self.use_play_bg = False
 
         # cursor blink
@@ -117,14 +119,14 @@ class BootState:
         line_h = 28
 
         for i, line in enumerate(self.visible_lines):
-            alpha = int(self.machine.game.phosphor.alpha)
+            alpha = int(self.game.phosphor.alpha)
             col = Colour.phosphor_colour(Colour.BRIGHT_GREEN, alpha)
             surf = self.font.render(line, True, col)
             screen.blit(surf, (x, y + i * line_h))
 
         if self.cursor_visible:
             cursor_y = y + len(self.visible_lines) * line_h
-            alpha = int(self.machine.game.phosphor.alpha)
+            alpha = int(self.game.phosphor.alpha)
             col = Colour.phosphor_colour(Colour.BRIGHT_GREEN, alpha)
             cursor = self.font.render("_", True, col)
             screen.blit(cursor, (x, cursor_y))

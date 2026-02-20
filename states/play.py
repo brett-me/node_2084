@@ -1,7 +1,10 @@
+
+# states/play.py
+
 import pygame
+
 from world.map import Map
 from world.suspicion import Suspicion
-from world.sensors import Sensor
 from world.player import Player
 from ui.message_banner import MessageSystem
 from config.settings import TimingConfig
@@ -13,19 +16,20 @@ class PlayState:
 
     def __init__(self, font, starting_suspicion=0):
         self.machine = None
+        self.game = None
+        self.font = font
 
-        self.timer = 0
+        self.timer = 0.0
         self.player = None
 
         self.map = Map(offset_y=100)
+        self.walls = self.map.get_walls()
 
         self.suspicion = Suspicion()
         self.suspicion.value = starting_suspicion
-
         self.show_suspicion = False
-        self.font = font
 
-        self.sensor = Sensor(origin=(114, 360), length=584, spread=72)
+        self.sensors = self.map.create_sensors() or []
         self.sensor_active = False
 
         self.has_moved = False
@@ -35,33 +39,31 @@ class PlayState:
 
     def update(self, dt):
         self.timer += dt
-        walls = self.map.get_walls()
+        walls = self.walls
 
-        if self.timer >= TimingConfig.PLAYER_SPAWN_DELAY:
-            if self.player is None:
-                x, y = self.map.get_spawn_points
-                self.player = Player(x, y)
+        if self.timer >= TimingConfig.PLAYER_SPAWN_DELAY and self.player is None:
+            x, y = self.map.get_spawn_point()
+            self.player = Player(x, y)
 
+        moved_this_frame = False
         if self.player:
             self.player.fade(dt)
 
-            moved_this_frame = False
-
             if self.player.alpha >= 255:
                 moved_this_frame = self.player.move(dt, walls)
+                self.show_suspicion = True
 
             if moved_this_frame:
                 self.has_moved = True
-
-            if self.player.alpha >= 255:
-                self.show_suspicion = True
 
         if self.timer >= TimingConfig.SENSOR_START_DELAY:
             self.sensor_active = True
 
         detected = False
-        if self.sensor_active:
-            detected = self.sensor.update(dt, self.player, self.suspicion)
+        if self.sensor_active and self.player and self.sensors:
+            for sensor in self.sensors:
+                if sensor.update(dt, self.player, self.suspicion):
+                    detected = True
 
         if detected and self.has_moved and not self.msg_shown:
             self.msg_shown = True
@@ -94,12 +96,15 @@ class PlayState:
         screen.fill(Colour.BACKGROUND)
         self.draw_grid(screen)
 
-        alpha = int(self.machine.game.phosphor.alpha)
+        alpha = int(self.game.phosphor.alpha) if self.game else 255
         self.map.render(screen, alpha)
 
-        self.sensor.render(screen, draw_cone=False)
+        for sensor in self.sensors:
+            sensor.render(screen, draw_cone=False)
+
         if self.sensor_active:
-            self.sensor.render(screen)
+            for sensor in self.sensors:
+                sensor.render(screen)
 
         if self.player:
             self.player.render(screen)

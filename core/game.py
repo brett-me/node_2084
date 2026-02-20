@@ -22,8 +22,9 @@ class Game:
         self.phosphor = PhosphorPulse()
 
         starting_state = BootState(self.font)
+
         self.machine = StateMachine(starting_state)
-        self.machine.game = self
+        self.machine.set_game(self)
 
         self.running = True
 

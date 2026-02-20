@@ -8,6 +8,11 @@ class StateMachine:
 
     def _bind(self, state):
         state.machine = self
+        state.game = self.game
+
+    def set_game(self, game):
+        self.game = game
+        self._bind(self.state)
 
     def change_state(self, new_state):
         self.state = new_state
