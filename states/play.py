@@ -1,6 +1,6 @@
 import pygame
 
-from world.map import Map
+from world.map.map import Map
 from world.suspicion import Suspicion
 from world.player import Player
 from ui.message_banner import MessageSystem
