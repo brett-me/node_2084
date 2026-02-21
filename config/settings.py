@@ -2,10 +2,11 @@ class GamePlayConfig:
     """central behavioural tuning"""
 
     SUSPICION_GAIN_RATE = 8  # per second while detected
+    SUSPICION_DECAY_RATE = 5
     SENSOR_DETECTION = 100  # lower equals faster detection, linked to infrared alpha
 
     MAX_INFRARED_ALPHA = 200  # infrared brightness
-
+    
     # bright green glitch intensity
     PHOS_MIN_ALPHA = 180
     PHOS_MAX_ALPHA = 255

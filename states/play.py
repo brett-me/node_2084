@@ -4,7 +4,7 @@ from world.map.map import Map
 from world.suspicion import Suspicion
 from world.player import Player
 from ui.message_banner import MessageSystem
-from config.settings import TimingConfig
+from config.settings import TimingConfig, GamePlayConfig
 from config.palette import Colour
 from config.grid import GridConfig
 
@@ -143,6 +143,9 @@ class PlayState:
             for sensor in self.sensors:
                 if sensor.update(dt, self.map, self.player, self.suspicion):
                     detected = True
+        
+        if self.player and (not detected):
+            self.suspicion.decrease(GamePlayConfig.SUSPICION_DECAY_RATE * dt)
 
         if detected and self.has_moved and not self.msg_shown:
             self.msg_shown = True

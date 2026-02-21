@@ -47,8 +47,6 @@ class Map:
         self._load_csv()
         self._build_static_walls()
 
-        print("sensor_emitters:", len(self.sensor_emitters), self.sensor_emitters[:3])
-
     def _load_csv(self):
         with open(self.csv_path, "r", encoding="utf-8") as f:
             lines = [ln.strip() for ln in f.readlines() if ln.strip()]
