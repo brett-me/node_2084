@@ -35,6 +35,8 @@ class PlayState:
         self.map.set_group_active("@", False)
         self.map.set_group_active("%", False)
         self.map.set_group_active("*", False)
+        
+        self.map.set_group_active("$", True)
 
         self.suspicion = Suspicion()
         self.suspicion.value = starting_suspicion
