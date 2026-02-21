@@ -44,7 +44,7 @@ class BootState:
             "NODE ID: 2084.114.7",
             "COGNITIVE SHELL: ACTIVE",
             "PERCEPTION BANDWIDTH: 12% (OPTIMAL)",
-            "EMOTIVE RANGE: SUPPRESSED",
+            "EMOTIONAL RANGE: SUPPRESSED",
         ]
 
         self.notice_lines = [
