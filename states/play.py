@@ -7,22 +7,26 @@ from ui.message_banner import MessageSystem
 from config.settings import TimingConfig
 from config.palette import Colour
 from config.grid import GridConfig
-from utils.paths import asset_path
 
 
 class PlayState:
     """main gameplay: movement, sensors, tasks, discoveries"""
 
     def __init__(self, font, starting_suspicion=0):
+
         self.machine = None
         self.game = None
         self.font = font
 
         self.timer = 0.0
 
-        self.map = Map(asset_path("maps", "map_2048.csv"))
+        self.map = Map("map_2048.csv")
         self.walls = self.map.get_walls()
         self.player = None
+
+        self.cycle_index = 1
+        self.corridor_sealed = False
+        self.map.set_group_active("!", False)
 
         self.suspicion = Suspicion()
         self.suspicion.value = starting_suspicion
@@ -70,6 +74,13 @@ class PlayState:
             self.msg_banner.trigger(TimingConfig.MSG_DELAY, TimingConfig.MSG_DURATION)
 
         self.msg_banner.update(dt)
+
+        if self.player and (not self.corridor_sealed):
+            cell = self.map.world_to_cell(self.player.rect.centerx, self.player.rect.centery)
+            if self.map.is_trigger(cell, "T"):
+                self.corridor_sealed = True
+                self.map.set_group_active("!", True)
+                self.walls = self.map.get_walls()
 
     def draw_grid(self, screen):
         spacing = GridConfig.CELL
