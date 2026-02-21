@@ -55,9 +55,8 @@ class PlayState:
         self.show_suspicion = False
 
         # --- sensors ---
-        # emitters always drawn; cones delayed by SENSOR_START_DELAY
+        # emitters always drawn; cones are staggered by each sensor's own "enabled" latch
         self.sensors = self.map.create_sensors() or []
-        self.sensor_active = False
 
         self.has_moved = False
         self.msg_banner = MessageSystem(self.font, "MOVEMENT ACKNOWLEDGED")
@@ -138,15 +137,11 @@ class PlayState:
         # trigger-driven doors
         self._process_triggers()
 
-        # sensors become active after delay (emitters still render immediately)
-        if self.timer >= TimingConfig.SENSOR_START_DELAY:
-            self.sensor_active = True
-
+        # sensors (no global delay; each sensor enables itself when player first enters its LOS)
         detected = False
         if self.player and self.sensors:
-            # Sensor.update handles active flag internally (cone clears when inactive)
             for sensor in self.sensors:
-                if sensor.update(dt, self.map, self.player, self.suspicion, active=self.sensor_active):
+                if sensor.update(dt, self.map, self.player, self.suspicion):
                     detected = True
 
         if detected and self.has_moved and not self.msg_shown:
@@ -188,14 +183,13 @@ class PlayState:
         alpha = int(self.game.phosphor.alpha) if self.game else 255
         self.map.render(screen, alpha)
 
-        # sensors: emitters always visible; cones only when active
+        # sensors: emitters always visible; cones only once each sensor is enabled
         if self.sensors:
             for sensor in self.sensors:
                 sensor.render(screen, self.map, draw_cone=False)
 
-            if self.sensor_active:
-                for sensor in self.sensors:
-                    sensor.render(screen, self.map, draw_cone=True)
+            for sensor in self.sensors:
+                sensor.render(screen, self.map, draw_cone=True)
 
         if self.player:
             self.player.render(screen)

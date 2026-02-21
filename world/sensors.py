@@ -5,11 +5,12 @@ from config.palette import Colour
 
 class Sensor:
     """
-    Grid sensor:
+    Grid sensor (staggered wake):
     - emitter always drawn
-    - cone is 5 parallel rays
+    - cone is 5 parallel rays (cells)
     - rays stop when they hit map occluders
-    - detection checks if player's cell lies in any ray path while alpha is high enough
+    - sensor is "disabled" until the player first steps into its line-of-sight cells
+    - once enabled, it pulses and can increase suspicion
     """
 
     def __init__(self, cell, direction_token, max_length_cells=30):
@@ -17,11 +18,18 @@ class Sensor:
         self.dir = direction_token        # "^", "v", "<", ">"
         self.max_len = max_length_cells
 
+        # pulse state (only used once enabled)
         self.alpha = 0.0
         self.fading_in = True
 
+        # activation latch
+        self.enabled = False  # becomes True once player enters LOS once
+
+        # cached ray data
         self._ray_cells = set()
         self._ray_endpoints = []
+
+    # ---- direction helpers ----
 
     def _forward(self):
         if self.dir == "^":
@@ -33,7 +41,7 @@ class Sensor:
         return (1, 0)
 
     def _perp(self):
-        fx, fy = self._forward()
+        fx, _ = self._forward()
         return (1, 0) if fx == 0 else (0, 1)
 
     def _pulse(self, dt):
@@ -49,6 +57,8 @@ class Sensor:
             if self.alpha <= 0:
                 self.alpha = 0.0
                 self.fading_in = True
+
+    # ---- ray casting ----
 
     def _cast_rays(self, game_map, occlusion_behaviour="B"):
         self._ray_cells.clear()
@@ -84,24 +94,39 @@ class Sensor:
             end_x, end_y = game_map.cell_center(last_free)
             self._ray_endpoints.append((end_x, end_y))
 
-    def update(self, dt, game_map, player, suspicion_system, active=True):
-        if not active:
-            self._ray_cells.clear()
-            self._ray_endpoints.clear()
-            return False
+    # ---- public API ----
 
-        self._pulse(dt)
+    def update(self, dt, game_map, player, suspicion_system):
+        """
+        Returns True if player detected (i.e. enabled + alpha high + player in ray cells).
+        """
+
+        # Always cast rays so we can "wake" based on LOS
         self._cast_rays(game_map, occlusion_behaviour="B")
 
         if not player:
             return False
 
+        player_cell = game_map.world_to_cell(player.rect.centerx, player.rect.centery)
+
+        # Wake logic: first time player steps into this sensor's LOS
+        if (not self.enabled) and (player_cell in self._ray_cells):
+            self.enabled = True
+            # start from dark so the first ramp feels deliberate
+            self.alpha = 0.0
+            self.fading_in = True
+
+        # If not enabled yet: no pulse, no detection, no suspicion
+        if not self.enabled:
+            return False
+
+        # Enabled: pulse + detect
+        self._pulse(dt)
+
         if self.alpha <= GamePlayConfig.SENSOR_DETECTION:
             return False
 
-        player_cell = game_map.world_to_cell(player.rect.centerx, player.rect.centery)
         detected = player_cell in self._ray_cells
-
         if detected:
             suspicion_system.increase(GamePlayConfig.SUSPICION_GAIN_RATE * dt)
 
@@ -111,9 +136,11 @@ class Sensor:
         ox, oy = game_map.cell_center(self.cell)
         overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
 
+        # emitter always visible
         pygame.draw.circle(overlay, Colour.SENSOR, (ox, oy), 6)
 
-        if draw_cone and self._ray_endpoints:
+        # cone only if enabled (and we have endpoints)
+        if draw_cone and self.enabled and self._ray_endpoints:
             points = [(ox, oy)] + self._ray_endpoints + [(ox, oy)]
             a = int(self.alpha * 0.25)
             pygame.draw.polygon(overlay, (*Colour.SENSOR, a), points)
