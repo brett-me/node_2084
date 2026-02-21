@@ -116,11 +116,11 @@ class Map:
                     self.task_cells_cycle2.setdefault(token, []).append((c, r))
 
                 # discoveries
-                elif token in self.DISCOVERIES_CYCLE_1:
+                elif token in self.DISCOVERIES_CYCLE_2:
                     self.discovery_cells.setdefault(token, []).append((c, r))
 
                 # anomalies
-                elif token in self.ANOMALIES:
+                elif token in self.ANOMALIES_CYCLE_1:
                     self.anomaly_cells.setdefault(token, []).append((c, r))
 
                 # sensors
@@ -222,7 +222,8 @@ class Map:
         # task zones (outline)
         for k, cells in self.task_cells.items():
             for c, r in cells:
-                pygame.draw.rect(screen, Colour.BRIGHT_GREEN, self._cell_rect(c, r), 1)
+                cx, cy = self.cell_to_world(c, r, centre=True)
+                pygame.draw.circle(screen, Colour.BRIGHT_GREEN, (cx, cy), 2)
 
         # discoveries (outline)
         for k, cells in self.discovery_cells.items():
