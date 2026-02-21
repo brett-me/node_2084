@@ -28,10 +28,11 @@ class PlayState:
 
         self.corridor_sealed = False
         self.door12_closed = False
-
+        self.door23_closed = False
 
         self.map.set_group_active("!", False)
         self.map.set_group_active("@", False)
+        self.map.set_group_active("%", False)
 
         self.suspicion = Suspicion()
         self.suspicion.value = starting_suspicion
@@ -92,6 +93,13 @@ class PlayState:
             if self.map.is_trigger(cell, "U"):
                 self.door12_closed = True
                 self.map.set_group_active("@", True)
+                self.walls = self.map.get_walls()
+        
+        if self.player and (not self.door23_closed):
+            cell = self.map.world_to_cell(self.player.rect.centerx, self.player.rect.centery)
+            if self.map.is_trigger(cell, "V"):
+                self.door23_closed = True
+                self.map.set_group_active("%", True)
                 self.walls = self.map.get_walls()
 
     def draw_grid(self, screen):
