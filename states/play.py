@@ -39,7 +39,7 @@ class PlayState:
         self.map.set_group_active("@", False)  # room 1->2 one-way close (cycle-only)
         self.map.set_group_active("%", False)  # room 2->3 one-way close (cycle-only)
         self.map.set_group_active("*", False)  # room 4 trap (cycle-only)
-        self.map.set_group_active("$", True)   # return wall: solid until task 4 opens it later
+        # "$" default is handled inside Map (__init__)
 
         # marker-driven trigger wiring:
         # trigger token -> (flag_attr_name, wall_group_token, permanent?)
@@ -54,8 +54,9 @@ class PlayState:
         self.suspicion.value = starting_suspicion
         self.show_suspicion = False
 
-        # sensors will be wired back in later
-        self.sensors = []
+        # --- sensors ---
+        # emitters always drawn; cones delayed by SENSOR_START_DELAY
+        self.sensors = self.map.create_sensors() or []
         self.sensor_active = False
 
         self.has_moved = False
@@ -99,7 +100,7 @@ class PlayState:
 
         changed = False
 
-        for trigger_token, (flag_name, wall_token, is_permanent) in self.trigger_rules.items():
+        for trigger_token, (flag_name, wall_token, _is_permanent) in self.trigger_rules.items():
             if getattr(self, flag_name):
                 continue
 
@@ -134,17 +135,18 @@ class PlayState:
             if moved_this_frame:
                 self.has_moved = True
 
-        # trigger-driven doors (processed once per frame)
+        # trigger-driven doors
         self._process_triggers()
 
-        # sensors (left as-is for now)
+        # sensors become active after delay (emitters still render immediately)
         if self.timer >= TimingConfig.SENSOR_START_DELAY:
             self.sensor_active = True
 
         detected = False
-        if self.sensor_active and self.player and self.sensors:
+        if self.player and self.sensors:
+            # Sensor.update handles active flag internally (cone clears when inactive)
             for sensor in self.sensors:
-                if sensor.update(dt, self.player, self.suspicion):
+                if sensor.update(dt, self.map, self.player, self.suspicion, active=self.sensor_active):
                     detected = True
 
         if detected and self.has_moved and not self.msg_shown:
@@ -186,13 +188,14 @@ class PlayState:
         alpha = int(self.game.phosphor.alpha) if self.game else 255
         self.map.render(screen, alpha)
 
+        # sensors: emitters always visible; cones only when active
         if self.sensors:
             for sensor in self.sensors:
-                sensor.render(screen, draw_cone=False)
+                sensor.render(screen, self.map, draw_cone=False)
 
             if self.sensor_active:
                 for sensor in self.sensors:
-                    sensor.render(screen)
+                    sensor.render(screen, self.map, draw_cone=True)
 
         if self.player:
             self.player.render(screen)
