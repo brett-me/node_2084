@@ -13,7 +13,6 @@ class PlayState:
     """main gameplay: movement, sensors, tasks, discoveries"""
 
     def __init__(self, font, starting_suspicion=0):
-
         self.machine = None
         self.game = None
         self.font = font
@@ -24,52 +23,121 @@ class PlayState:
         self.walls = self.map.get_walls()
         self.player = None
 
+        # cycle control
         self.cycle_index = 1
 
-        self.corridor_sealed = False
+        # permanent / one-way flags
+        self.corridor_sealed = False  # T -> activates "!" permanently (never resets)
+
+        # cycle-only door flags (U/V/W -> activate @/%/* for remainder of current cycle)
         self.door12_closed = False
         self.door23_closed = False
         self.room4_trapped = False
 
-        self.map.set_group_active("!", False)
-        self.map.set_group_active("@", False)
-        self.map.set_group_active("%", False)
-        self.map.set_group_active("*", False)
-        
-        self.map.set_group_active("$", True)
+        # door group defaults
+        self.map.set_group_active("!", False)  # corridor seal (permanent once triggered)
+        self.map.set_group_active("@", False)  # room 1->2 one-way close (cycle-only)
+        self.map.set_group_active("%", False)  # room 2->3 one-way close (cycle-only)
+        self.map.set_group_active("*", False)  # room 4 trap (cycle-only)
+        self.map.set_group_active("$", True)   # return wall: solid until task 4 opens it later
+
+        # marker-driven trigger wiring:
+        # trigger token -> (flag_attr_name, wall_group_token, permanent?)
+        self.trigger_rules = {
+            "T": ("corridor_sealed", "!", True),
+            "U": ("door12_closed", "@", False),
+            "V": ("door23_closed", "%", False),
+            "W": ("room4_trapped", "*", False),
+        }
 
         self.suspicion = Suspicion()
         self.suspicion.value = starting_suspicion
         self.show_suspicion = False
 
-        # for now: focus on permanent walls rendering; sensors come next step
+        # sensors will be wired back in later
         self.sensors = []
         self.sensor_active = False
 
         self.has_moved = False
-
         self.msg_banner = MessageSystem(self.font, "MOVEMENT ACKNOWLEDGED")
         self.msg_shown = False
 
+    # -----------------------------
+    # Cycle scaffolding (not called yet)
+    # -----------------------------
+    def _reset_cycle_doors(self):
+        """Re-open cycle-only doors at the start of a new cycle."""
+        self.door12_closed = False
+        self.door23_closed = False
+        self.room4_trapped = False
+
+        self.map.set_group_active("@", False)
+        self.map.set_group_active("%", False)
+        self.map.set_group_active("*", False)
+
+        # IMPORTANT: do NOT touch corridor seal "!" (permanent once triggered)
+        # IMPORTANT: do NOT touch return wall "$" here (task-driven later)
+
+        self.walls = self.map.get_walls()
+
+    def advance_cycle(self):
+        """Called later when Task 4 completes."""
+        self.cycle_index += 1
+        self._reset_cycle_doors()
+
+    # -----------------------------
+    # Trigger processing
+    # -----------------------------
+    def _process_triggers(self):
+        """Checks player cell against trigger tokens and activates wall groups as needed."""
+        if not self.player:
+            return
+
+        cell = self.map.world_to_cell(self.player.rect.centerx, self.player.rect.centery)
+        if cell is None:
+            return
+
+        changed = False
+
+        for trigger_token, (flag_name, wall_token, is_permanent) in self.trigger_rules.items():
+            if getattr(self, flag_name):
+                continue
+
+            if self.map.is_trigger(cell, trigger_token):
+                setattr(self, flag_name, True)
+                self.map.set_group_active(wall_token, True)
+                changed = True
+
+        if changed:
+            self.walls = self.map.get_walls()
+
+    # -----------------------------
+    # Update / Render
+    # -----------------------------
     def update(self, dt):
         self.timer += dt
-        walls = self.walls
 
+        # spawn player after delay (unchanged behaviour)
         if self.timer >= TimingConfig.PLAYER_SPAWN_DELAY and self.player is None:
             x, y = self.map.get_spawn_point()
             self.player = Player(x, y)
 
+        # movement / collision
         moved_this_frame = False
         if self.player:
             self.player.fade(dt)
 
             if self.player.alpha >= 255:
-                moved_this_frame = self.player.move(dt, walls)
+                moved_this_frame = self.player.move(dt, self.walls)
                 self.show_suspicion = True
 
             if moved_this_frame:
                 self.has_moved = True
 
+        # trigger-driven doors (processed once per frame)
+        self._process_triggers()
+
+        # sensors (left as-is for now)
         if self.timer >= TimingConfig.SENSOR_START_DELAY:
             self.sensor_active = True
 
@@ -84,34 +152,6 @@ class PlayState:
             self.msg_banner.trigger(TimingConfig.MSG_DELAY, TimingConfig.MSG_DURATION)
 
         self.msg_banner.update(dt)
-
-        if self.player and (not self.corridor_sealed):
-            cell = self.map.world_to_cell(self.player.rect.centerx, self.player.rect.centery)
-            if self.map.is_trigger(cell, "T"):
-                self.corridor_sealed = True
-                self.map.set_group_active("!", True)
-                self.walls = self.map.get_walls()
-
-        if self.player and (not self.door12_closed):
-            cell = self.map.world_to_cell(self.player.rect.centerx, self.player.rect.centery)
-            if self.map.is_trigger(cell, "U"):
-                self.door12_closed = True
-                self.map.set_group_active("@", True)
-                self.walls = self.map.get_walls()
-        
-        if self.player and (not self.door23_closed):
-            cell = self.map.world_to_cell(self.player.rect.centerx, self.player.rect.centery)
-            if self.map.is_trigger(cell, "V"):
-                self.door23_closed = True
-                self.map.set_group_active("%", True)
-                self.walls = self.map.get_walls()
-
-        if self.player and (not self.room4_trapped):
-            cell = self.map.world_to_cell(self.player.rect.centerx, self.player.rect.centery)
-            if self.map.is_trigger(cell, "W"):
-                self.room4_trapped = True
-                self.map.set_group_active("*", True)
-                self.walls = self.map.get_walls()
 
     def draw_grid(self, screen):
         spacing = GridConfig.CELL

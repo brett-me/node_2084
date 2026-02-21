@@ -23,7 +23,7 @@ def parse_markers(grid):
             elif t in ("^", "v", "<", ">"):
                 sensors.append((c, r, t))
 
-            elif t in ("A", "B", "C", "D"):
+            elif t in ("A", "B", "C", "D", "a", "b", "c"):
                 task_cells.setdefault(t, []).append((c, r))
 
             elif t in ("x", "y", "z"):
