@@ -35,7 +35,7 @@ class TaskMessage:
         line_h=28,
         cursor_char="_",
         cursor_blink_s=0.50,
-        cursor_only_1_s=0.50,
+        cursor_only_1_s=0.25,
         cursor_only_2_s=0.75,
         line_gap_s=0.75,
         hold_after_block_s=1,
