@@ -3,6 +3,7 @@ import pygame
 from world.map.map import Map
 from world.suspicion import Suspicion
 from world.player import Player
+from world.tasks.task1 import Task1PathOptimisation
 from ui.message_banner import MessageSystem
 from config.settings import TimingConfig, GamePlayConfig
 from config.palette import Colour
@@ -10,7 +11,7 @@ from config.grid import GridConfig
 
 
 class PlayState:
-    """main gameplay: movement, sensors, tasks, discoveries"""
+    """Main gameplay: player, map, sensors, doors, Task1."""
 
     def __init__(self, font, starting_suspicion=0):
         self.machine = None
@@ -35,14 +36,12 @@ class PlayState:
         self.room4_trapped = False
 
         # door group defaults
-        self.map.set_group_active("!", False)  # corridor seal (permanent once triggered)
-        self.map.set_group_active("@", False)  # room 1->2 one-way close (cycle-only)
-        self.map.set_group_active("%", False)  # room 2->3 one-way close (cycle-only)
-        self.map.set_group_active("*", False)  # room 4 trap (cycle-only)
-        # "$" default is handled inside Map (__init__)
+        self.map.set_group_active("!", False)
+        self.map.set_group_active("@", False)
+        self.map.set_group_active("%", False)
+        self.map.set_group_active("*", False)
+        # "$" default handled in Map (__init__)
 
-        # marker-driven trigger wiring:
-        # trigger token -> (flag_attr_name, wall_group_token, permanent?)
         self.trigger_rules = {
             "T": ("corridor_sealed", "!", True),
             "U": ("door12_closed", "@", False),
@@ -54,19 +53,22 @@ class PlayState:
         self.suspicion.value = starting_suspicion
         self.show_suspicion = False
 
-        # --- sensors ---
-        # emitters always drawn; cones are staggered by each sensor's own "enabled" latch
+        # sensors
         self.sensors = self.map.create_sensors() or []
 
         self.has_moved = False
         self.msg_banner = MessageSystem(self.font, "MOVEMENT ACKNOWLEDGED")
         self.msg_shown = False
 
+        # ---- Task 1 ----
+        anchors = self.map.get_task1_anchors()
+        self.task1 = Task1PathOptimisation(anchors)
+        self.task1_started = False
+
     # -----------------------------
     # Cycle scaffolding (not called yet)
     # -----------------------------
     def _reset_cycle_doors(self):
-        """Re-open cycle-only doors at the start of a new cycle."""
         self.door12_closed = False
         self.door23_closed = False
         self.room4_trapped = False
@@ -75,21 +77,16 @@ class PlayState:
         self.map.set_group_active("%", False)
         self.map.set_group_active("*", False)
 
-        # IMPORTANT: do NOT touch corridor seal "!" (permanent once triggered)
-        # IMPORTANT: do NOT touch return wall "$" here (task-driven later)
-
         self.walls = self.map.get_walls()
 
     def advance_cycle(self):
-        """Called later when Task 4 completes."""
         self.cycle_index += 1
         self._reset_cycle_doors()
 
     # -----------------------------
-    # Trigger processing
+    # Trigger processing (doors)
     # -----------------------------
     def _process_triggers(self):
-        """Checks player cell against trigger tokens and activates wall groups as needed."""
         if not self.player:
             return
 
@@ -98,11 +95,9 @@ class PlayState:
             return
 
         changed = False
-
         for trigger_token, (flag_name, wall_token, _is_permanent) in self.trigger_rules.items():
             if getattr(self, flag_name):
                 continue
-
             if self.map.is_trigger(cell, trigger_token):
                 setattr(self, flag_name, True)
                 self.map.set_group_active(wall_token, True)
@@ -134,16 +129,16 @@ class PlayState:
             if moved_this_frame:
                 self.has_moved = True
 
-        # trigger-driven doors
+        # door triggers
         self._process_triggers()
 
-        # sensors (no global delay; each sensor enables itself when player first enters its LOS)
+        # sensors (always ticking; no global delay now)
         detected = False
         if self.player and self.sensors:
             for sensor in self.sensors:
                 if sensor.update(dt, self.map, self.player, self.suspicion):
                     detected = True
-        
+
         if self.player and (not detected):
             self.suspicion.decrease(GamePlayConfig.SUSPICION_DECAY_RATE * dt)
 
@@ -151,11 +146,20 @@ class PlayState:
             self.msg_shown = True
             self.msg_banner.trigger(TimingConfig.MSG_DELAY, TimingConfig.MSG_DURATION)
 
+        # ---- Task 1 ----
+        if self.player:
+            player_cell = self.map.world_to_cell(self.player.rect.centerx, self.player.rect.centery)
+
+            if (not self.task1_started) and self.map.is_task1_trigger(player_cell):
+                self.task1_started = True
+                self.task1.start(player_cell)
+
+            self.task1.update(dt, player_cell)
+
         self.msg_banner.update(dt)
 
     def draw_grid(self, screen):
         spacing = GridConfig.CELL
-
         ox, oy = self.map.offset_x, self.map.offset_y
         grid_w = GridConfig.COLS * spacing
         grid_h = GridConfig.ROWS * spacing
@@ -176,7 +180,6 @@ class PlayState:
         padding = 16
         x = screen.get_width() - surf.get_width() - padding
         y = padding
-
         screen.blit(surf, (x, y))
 
     def render(self, screen):
@@ -186,13 +189,15 @@ class PlayState:
         alpha = int(self.game.phosphor.alpha) if self.game else 255
         self.map.render(screen, alpha)
 
-        # sensors: emitters always visible; cones only once each sensor is enabled
+        # sensors: emitters always visible; cones drawn from cached rays
         if self.sensors:
             for sensor in self.sensors:
                 sensor.render(screen, self.map, draw_cone=False)
-
             for sensor in self.sensors:
                 sensor.render(screen, self.map, draw_cone=True)
+
+        # Task 1 tiles
+        self.task1.render(screen, self.map, phosphor_alpha=alpha)
 
         if self.player:
             self.player.render(screen)

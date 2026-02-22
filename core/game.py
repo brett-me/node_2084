@@ -2,6 +2,7 @@ import pygame
 
 from core.state_machine import StateMachine
 from states.boot import BootState
+from states.play import PlayState
 from fx.phosphor import PhosphorPulse
 from config.grid import GridConfig
 
@@ -20,7 +21,7 @@ class Game:
 
         self.phosphor = PhosphorPulse()
 
-        starting_state = BootState(self.font)
+        starting_state = PlayState(self.font)
 
         self.machine = StateMachine(starting_state)
         self.machine.set_game(self)

@@ -9,7 +9,7 @@ class Player:
     def __init__(self, x, y):
         self.rect = pygame.Rect(x, y, 16, 16)
 
-        self.speed = 165  # pixels per second
+        self.speed = 150  # pixels per second
         self.alpha = 0  # start invisible
 
     def fade(self, dt):

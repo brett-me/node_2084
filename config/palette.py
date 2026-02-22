@@ -8,6 +8,11 @@ class Colour:
     PLAYER_CORE = (220, 255, 220)  # almost pure white
     SENSOR = (255, 140, 0)
 
+    # Task1 tiles
+    TASK1_ACTIVE = (50, 220, 60)    
+    TASK1_LOCKED = (30, 140, 40)       
+    TASK1_PROCESSED = (15, 100, 20)
+
     @staticmethod
     def phosphor_colour(base_rgb, alpha_value):
         # alpha_value is 200..255; convert to 0.78..1.0 brightness factor
