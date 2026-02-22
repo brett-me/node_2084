@@ -156,6 +156,10 @@ class Task1PathOptimisation:
         if not self._player_in_zone(player_cell, self._linger_cell):
             self._linger_cell = None
 
+    def current_target_is_centre(self):
+        t = self._current_target()
+        return t == self.anchors["m"]
+
     # ----------------------------
     # Update
     # ----------------------------

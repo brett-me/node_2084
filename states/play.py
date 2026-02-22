@@ -4,7 +4,8 @@ from world.map.map import Map
 from world.suspicion import Suspicion
 from world.player import Player
 from world.tasks.task1 import Task1PathOptimisation
-from ui.message_banner import MessageSystem
+from ui.single_line import SingleLineMessage
+from ui.task_message import TaskMessage
 from config.settings import TimingConfig, GamePlayConfig
 from config.palette import Colour
 from config.grid import GridConfig
@@ -28,7 +29,7 @@ class PlayState:
         self.cycle_index = 1
 
         # permanent / one-way flags
-        self.corridor_sealed = False  # T -> activates "!" permanently (never resets)
+        self.corridor_sealed = False  # T -> activates "!" permanently
 
         # cycle-only door flags (U/V/W -> activate @/%/* for remainder of current cycle)
         self.door12_closed = False
@@ -56,14 +57,19 @@ class PlayState:
         # sensors
         self.sensors = self.map.create_sensors() or []
 
+        # movement banner
         self.has_moved = False
-        self.msg_banner = MessageSystem(self.font, "MOVEMENT ACKNOWLEDGED")
+        self.msg_banner = SingleLineMessage(self.font, "MOVEMENT ACKNOWLEDGED")
         self.msg_shown = False
 
         # ---- Task 1 ----
         anchors = self.map.get_task1_anchors()
         self.task1 = Task1PathOptimisation(anchors)
         self.task1_started = False
+        self._task1_was_complete = False
+
+        self.task1_banner = TaskMessage(self.font)
+        self.task1_banner_started = False
 
     # -----------------------------
     # Cycle scaffolding (not called yet)
@@ -112,7 +118,7 @@ class PlayState:
     def update(self, dt):
         self.timer += dt
 
-        # spawn player after delay (unchanged behaviour)
+        # spawn player after delay
         if self.timer >= TimingConfig.PLAYER_SPAWN_DELAY and self.player is None:
             x, y = self.map.get_spawn_point()
             self.player = Player(x, y)
@@ -132,7 +138,7 @@ class PlayState:
         # door triggers
         self._process_triggers()
 
-        # sensors (always ticking; no global delay now)
+        # sensors
         detected = False
         if self.player and self.sensors:
             for sensor in self.sensors:
@@ -154,9 +160,20 @@ class PlayState:
                 self.task1_started = True
                 self.task1.start(player_cell)
 
-            self.task1.update(dt, player_cell)
+            # only update task1 once started (safe even if task1.update already guards)
+            if self.task1_started:
+                self.task1.update(dt, player_cell)
+
+                # Edge trigger: fire exactly when Task1 first becomes complete
+                task1_now_complete = self.task1.is_complete
+                if (not self.task1_banner_started) and task1_now_complete and (not self._task1_was_complete):
+                    self.task1_banner_started = True
+                    self.task1_banner.trigger()
+
+                self._task1_was_complete = task1_now_complete
 
         self.msg_banner.update(dt)
+        self.task1_banner.update(dt)
 
     def draw_grid(self, screen):
         spacing = GridConfig.CELL
@@ -189,14 +206,14 @@ class PlayState:
         alpha = int(self.game.phosphor.alpha) if self.game else 255
         self.map.render(screen, alpha)
 
-        # sensors: emitters always visible; cones drawn from cached rays
+        # sensors
         if self.sensors:
             for sensor in self.sensors:
                 sensor.render(screen, self.map, draw_cone=False)
             for sensor in self.sensors:
                 sensor.render(screen, self.map, draw_cone=True)
 
-        # Task 1 tiles
+        # Task 1 tiles (Task1 should no-op render if idle)
         self.task1.render(screen, self.map, phosphor_alpha=alpha)
 
         if self.player:
@@ -206,3 +223,4 @@ class PlayState:
             self.draw_suspicion_meter(screen)
 
         self.msg_banner.render(screen, Colour.BRIGHT_GREEN)
+        self.task1_banner.render(screen, Colour.BRIGHT_GREEN)
